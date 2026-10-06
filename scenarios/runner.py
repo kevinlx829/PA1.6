@@ -2,7 +2,7 @@ import os
 import time
 from typing import Dict, List, Optional
 
-from utils.config import load_config
+from utils.config import Config, load_config
 from utils.rng import RNG
 from sensors.temp_sensor import TempSensor
 from sensors.filters import hold_last, MovingAverageFilter
@@ -12,9 +12,8 @@ from simulations.room_model import step_room
 from simulations.environment import Environment
 from plotting.plots import plot_timeseries, plot_error, plot_duty, plot_predictive, plot_heater
 
-def run_scenario(scenario_path: str):
-    scenario = load_config(scenario_path)
-    rng = RNG(scenario.sim.seed)
+def simulate_scenario(scenario: Config, seed: Optional[int] = None) -> Dict[str, List[float]]:
+    rng = RNG(scenario.sim.seed if seed is None else seed)
 
     env = Environment(
         base=scenario.env.base,
@@ -95,6 +94,14 @@ def run_scenario(scenario_path: str):
 
         T = step_room(T, heater, T_out, scenario.model.R, scenario.model.C, scenario.model.P,
                       dt, scenario.model.process_sigma, rng)
+
+    return log
+
+
+def run_scenario(scenario_path: str):
+    scenario = load_config(scenario_path)
+    log = simulate_scenario(scenario)
+    use_predictive = getattr(scenario.controller, "type", "predictive_onoff") != "onoff"
 
     # Write CSV
     ts = time.strftime("%Y%m%d-%H%M%S")
